@@ -1,0 +1,105 @@
+<?php
+
+// @codingStandardsIgnoreFile
+
+/**
+ * Product schema attributes template
+ *
+ * @var $block \Magento\Catalog\Block\Product\View\Attributes
+ */
+?>
+<?php
+    $_helper = $this->helper('Magento\Catalog\Helper\Output');
+    $_product = $block->getProduct();
+    $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+    $currencysymbol = $objectManager->get('Magento\Store\Model\StoreManagerInterface');
+    $currency = $currencysymbol->getStore()->getCurrentCurrencyCode();
+    if ($_product->isAvailable()) {
+        $avail = "http://schema.org/InStock";
+    } else {
+        $avail = "http://schema.org/OutOfStock";
+    }
+?>
+<?php if ($this->helper('DoIRun\RichSnippet\Helper\ConfigData')->getConfig('doirun_richsnippet/nenable/product')): ?>
+<script type="application/ld+json" id="productJSON">
+{
+    "@context":"http://schema.org",
+    "@type":"Product",
+    "name":"<?php echo $_product->getName(); ?>",
+    "id":"<?php echo $_product->getSku(); ?>",
+    "sku":"<?php echo $_product->getSku(); ?>",
+    "description":"<?php echo $_helper->productAttribute($_product, $_product->getShortDescription(), 'short_description'); ?>"
+}
+</script>
+<?php endif ?>
+<?php if ($this->helper('DoIRun\RichSnippet\Helper\ConfigData')->getConfig('doirun_richsnippet/nenable/offer')): ?>
+<script type="application/ld+json" id="offerJSON">
+{
+    "@context":"http://schema.org",
+    "@type":"Offer",
+    "price":"<?php echo $_product->getFinalPrice(); ?>",
+    "priceCurrency":"<?php echo $currency; ?>",
+    "availability":"<?php echo $avail; ?>",
+    "itemOffered": {
+        "@type":"Product",
+        "@id":"<?php echo $_product->getSku(); ?>"
+    }
+}
+</script>
+<?php endif ?>
+<?php if ($this->helper('DoIRun\RichSnippet\Helper\ConfigData')->getConfig('doirun_richsnippet/nenable/javascript')): ?>
+<script type="text/javascript">
+    require(['jquery'],function($) {
+        $(window).on("load", function () {
+            console.log("Process JSON+LD Snippets");
+            function waitfortime(time) {
+                console.log("tick");
+                if($('div.p-w-r section.pr-review-snippet-container script[type="application/ld+json"]').html() != null) {
+                    console.log("tock");
+                    var aggregateRatingJSON = JSON.parse($('div.p-w-r section.pr-review-snippet-container script[type="application/ld+json"]').html());
+                    var productJSON = JSON.parse(document.getElementById("productJSON").innerHTML);
+                    var offerJSON = JSON.parse(document.getElementById("offerJSON").innerHTML);
+
+                    var completedJSON = document.createElement('script');
+                    completedJSON.type = "application/ld+json";
+                    completedJSON.id = "DoIRun_JSON+LD";
+                    array = {
+                        "@context": "http://schema.org",
+                        "@type": "Product",
+                        "ProductID" : productJSON.id,
+                        "sku" : productJSON.sku,
+                        "name": productJSON.name,
+                        "description": productJSON.description,
+                        "offers": {
+                            "@type": "Offer",
+                            "price": offerJSON.price,
+                            "priceCurrency": offerJSON.priceCurrency,
+                            "availability": offerJSON.availability
+                        },
+                        aggregateRating: {
+                            "ratingValue": aggregateRatingJSON.ratingValue,
+                            "reviewCount": aggregateRatingJSON.reviewCount
+                        }
+                    };
+                    completedJSON.text = JSON.stringify(array);
+                    $("#contentarea").after(completedJSON);
+                    $('div.p-w-r section.pr-review-snippet-container script[type="application/ld+json"]').remove()
+                    document.getElementById("productJSON").remove();
+                    document.getElementById("offerJSON").remove();
+                    //Remove Magento default microdata to remove confusion from page.
+                    $('[itemtype]').removeAttr("itemtype");
+                    $('[itemscope]').removeAttr("itemscope");
+                    $('[itemprop]').removeAttr('itemprop');
+                }
+                else {
+                    setTimeout(function () {
+                        waitfortime(time);
+                    }, time);
+                }
+            }
+            waitfortime(50);
+        });
+    });
+</script>
+<?php endif ?>
+
